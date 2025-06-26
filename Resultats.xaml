@@ -1,0 +1,34 @@
+﻿<Window x:Class="MLC_Index.Resultats"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:MLC_Index"
+        mc:Ignorable="d"
+        Title="Resultats" Height="450" Width="800">
+    <Grid Background="#FFF3AFAF">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="0.05*"/>
+            <RowDefinition Height="0.2*"/>
+            <RowDefinition Height="0.05*"/>
+            <RowDefinition Height="0.8*"/>
+            <RowDefinition Height="0.1*"/>
+            <RowDefinition Height="0.05*"/>
+        </Grid.RowDefinitions>
+
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="0.08*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="0.3*"/>
+            <ColumnDefinition Width="0.08*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3"  TextWrapping="Wrap" HorizontalAlignment="Center"  FontWeight="Bold" FontStyle="Italic" FontSize="36" ><Run Language="fr-fr" Text="Résultats"/></TextBlock>
+        
+        <TextBox  x:Name="resultats" TextWrapping="Wrap" Text="TextBox" Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="3" TextChanged="TextBox_TextChanged" TextAlignment="Center" FontSize="16"  />
+        
+        <Button  Content="OK"  Grid.Row="4" Grid.Column="3"  Background="#FFDCB708" Click="Button_Click" Foreground="Black" BorderBrush="#FFDCB708" IsEnabled="True" />
+
+    </Grid>
+</Window>
