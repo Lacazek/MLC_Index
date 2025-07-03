@@ -16,6 +16,8 @@ namespace MLC_Index
         private int _numberOfIndice;
         private string _path;
 
+        public string output;
+
         public model(ScriptContext context)
         {
             _context = context;
@@ -33,25 +35,15 @@ namespace MLC_Index
             string filename = "MLC_Index.csv";
 
             StreamWriter sw = new StreamWriter(Path.Combine(_path, filename));
-            sw.WriteLine("nom;prénom;IPP;course;plan;dose totale;nb de fraction;MU;Facteur de modulation;EQF;MI;Overtravel");
+            sw.WriteLine("nom;prénom;IPP;course;plan;dose totale;nb de fraction;MU;Facteur de modulation;EQF;MI;Overtravel,MCSv");
             sw.WriteLine("{0};{1};{2};{3};{4};{5};{6};{7};{8};{9};{10};{11}",
-            _context.Patient.Name, _context.Patient.FirstName, _context.Patient.Id, _context.PlanSetup.Course.Name, _context.PlanSetup.Name, _context.PlanSetup.TotalDose.Dose, _context.PlanSetup.NumberOfFractions, _index[0].Item2, _index[1].Item2, _index[2].Item2, _index[3].Item2, _index[4].Item2);
+            _context.Patient.Name, _context.Patient.FirstName, _context.Patient.Id, _context.PlanSetup.Course.Name, _context.PlanSetup.Name, _context.PlanSetup.TotalDose.Dose, _context.PlanSetup.NumberOfFractions, _index[0].Item2, _index[1].Item2, _index[2].Item2, _index[3].Item2, _index[4].Item2, _index[5].Item2);
             sw.Close();
 
-
-            Resultats resultats = new Resultats(CreateResultatRecap());
+            Resultats resultats = new Resultats(output);
             resultats.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             resultats.ShowDialog();
         }
-
-        internal string CreateResultatRecap()
-        {
-            return $"UM : {_index[0].Item2} UM\nFacteur de modulation : {Math.Round(_index[1].Item2,2)} UM/cGy\nChamp carré equivalent : {Math.Round(_index[2].Item2,2)} cm²\nMI : {_index[3].Item2}\nOvertravel : {_index[4].Item2}";
-
-
-        }
-
-
 
         internal void CalculateIndice()
         {
@@ -75,7 +67,11 @@ namespace MLC_Index
             CalculateOverTravel();
 
             calculationstep++;
-            progressWindow.UpdateProgress((int)(((double)(calculationstep) / _numberOfIndice + 1) * 100), "Calcul des ");
+            progressWindow.UpdateProgress((int)(((double)(calculationstep) / _numberOfIndice + 1) * 100), "Calcul du MCSv");
+            CalculateMCSv();
+
+            calculationstep++;
+            progressWindow.UpdateProgress((int)(((double)(calculationstep) / _numberOfIndice + 1) * 100), "Calcul des");
 
             progressWindow.Close();
         }
@@ -90,7 +86,10 @@ namespace MLC_Index
                     UM = Math.Round(UM + b.Meterset.Value, 2);
             }
             AddIndex = new Tuple<string, double>("UM", UM);
-            AddIndex = new Tuple<string, double>("UM/cGy", UM / ((_context.PlanSetup.TotalDose.Dose/(int)_context.PlanSetup.NumberOfFractions) * 100));
+            AddIndex = new Tuple<string, double>("UM/cGy", UM / ((_context.PlanSetup.TotalDose.Dose / (int)_context.PlanSetup.NumberOfFractions) * 100));
+            output += $"UM: {_index[0].Item2} UM\n";
+            output += $"Facteur de modulation : {Math.Round(_index[1].Item2, 3)} UM / cGy\n";
+
         }
         #endregion
         #region Equivalent Square Field
@@ -110,10 +109,10 @@ namespace MLC_Index
                         {
                             for (int leaf = 0; leaf < leafposition.GetLength(1); leaf++)
                             {
-                                double pos1 = leafposition[0, leaf]; // Bank A
-                                double pos2 = leafposition[1, leaf]; // Bank B
+                                double pos1 = leafposition[0, leaf];
+                                double pos2 = leafposition[1, leaf];
 
-                                double leafGap = Math.Abs(pos2 - pos1); // mm
+                                double leafGap = Math.Abs(pos2 - pos1);
                                 EQF += (leafGap * leafWidthHal) / 100.0 / 100.0;
 
                             }
@@ -123,6 +122,7 @@ namespace MLC_Index
             }
 
             AddIndex = new Tuple<string, double>("Equivalent Square Field", EQF);
+            output += $"Champ carré equivalent : {Math.Round(_index[2].Item2, 3)} cm²\n";
 
         }
         #endregion
@@ -130,7 +130,6 @@ namespace MLC_Index
         internal void CalculateMI()
         {
             double MLCSpeed = 0.0;
-            //double Threshold;
             double GantrySpeed = 6.000;
 
             foreach (var b in _context.PlanSetup.Beams)
@@ -158,11 +157,11 @@ namespace MLC_Index
             }
 
             //double Z_mlcspeed = (1 / (b.ControlPoints.Count - 1))
-            AddIndex = new Tuple<string, double>("MLC speed", MLCSpeed);
+            AddIndex = new Tuple<string, double>("MLC speed", Math.Round(MLCSpeed,3));
+            output += $"MI : {_index[3].Item2}\n";
 
         }
         #endregion
-
         #region OverTravel
         internal void CalculateOverTravel()
         {
@@ -201,17 +200,73 @@ namespace MLC_Index
                 }
             }
             AddIndex = new Tuple<string, double>("Overtravelling Banc", Overtravel);
-
+            output += $"Overtravel : {Math.Round(_index[4].Item2,3)}\n";
         }
         #endregion
+        #region MCSv
+        internal void CalculateMCSv()
+        {
+            double MCSv = 0.0;
+            double Leaf_Width = 5; // mm;
+            double sumMetersetWeight=0.0;
 
+            foreach (var b in _context.PlanSetup.Beams)
+            {
+                if (!b.IsSetupField)
+                {
+                    sumMetersetWeight += b.ControlPoints.Last().MetersetWeight;
+                    double previousMetersetWeight = 0.00;
+
+                    foreach (var cp in b.ControlPoints)
+                    {
+                        var mlcPositions = cp.LeafPositions;
+
+                        double maxposA = Enumerable.Range(0, mlcPositions.GetLength(1)).Max(c => mlcPositions[1, c]);
+                        double maxposB = Enumerable.Range(0, mlcPositions.GetLength(1)).Max(c => mlcPositions[0, c]);
+
+                        List<double> Openings = new List<double>();
+                        double EffectiveSurface = 0.00; 
+
+                        for (int i = 1; i < mlcPositions.GetLength(1)-1; i++)
+                        {
+                            EffectiveSurface += (Math.Max(0.0, mlcPositions[1, i-1] - mlcPositions[0, i - 1])/(maxposA-maxposB)) * Leaf_Width;
+                            Openings.Add(Math.Max(0.0, mlcPositions[0, i-1] - mlcPositions[0, i])* Math.Max(0.0, mlcPositions[1, i - 1] - mlcPositions[1, i]));
+                        }
+                        //MessageBox.Show((EffectiveSurface * (cp.MetersetWeight - previousMetersetWeight)).ToString()+ "    " + (cp.MetersetWeight - previousMetersetWeight).ToString() +"    " + ComputeVG(Openings.ToArray()).ToString());
+                        MCSv += EffectiveSurface * Math.Abs(cp.MetersetWeight -previousMetersetWeight) * ComputeVG(Openings.ToArray());
+                        previousMetersetWeight = cp.MetersetWeight;
+                    }
+                }
+            }
+            MCSv /= sumMetersetWeight;
+
+            AddIndex = new Tuple<string, double>("MCSv", MCSv);
+            output += $"MCSv : {Math.Round(_index[5].Item2, 3)}\n";
+        }
+
+        double ComputeVG(double[] openings)
+        {
+            double vgSum = 0.0;
+            double epsilon = 0.01;
+            int count = openings.Length;
+
+            for (int i = 0; i < count - 1; i++)
+            {
+                double d1 = openings[i];
+                double d2 = openings[i + 1];
+                double maxD = Math.Max(Math.Max(d1, d2), epsilon);
+
+                double diff = Math.Abs(d1 - d2);
+                vgSum += (1.0 - (diff / maxD));
+            }
+            return vgSum / (count - 1);
+        }
+        #endregion
 
 
         internal Tuple<string, double> AddIndex
         {
             set { _index.Add(value); }
         }
-
     }
-
 }
